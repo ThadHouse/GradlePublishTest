@@ -1,0 +1,98 @@
+def pubsSetupModel = { project ->
+    project.model {
+        components {
+            pubs(NativeLibrarySpec) {
+                targetPlatform project.buildPlatform
+                if (project.hasProperty('buildPlatform2')) {
+                    targetPlatform project.buildPlatform2
+                }
+                
+                setupDefines(project, binaries)
+
+                sources {
+                    cpp {
+                        source {
+                            srcDirs = ["${rootDir}/src"]
+                            includes = ['**/*.cpp']
+                        }
+                        exportedHeaders {
+                            srcDirs = ["${rootDir}/include"]
+                            includes = ['**/*.h']
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+def pubsZipTask = { project ->
+    project.ext.pubsZip = project.tasks.create("pubsZip", Zip) {
+        description = 'Creates platform-specific zip of the desktop pubs libraries.'
+        group = 'WPILib'
+        destinationDir = project.buildDir
+        baseName = 'pubs'
+        classifier = "${project.classifier}"
+        duplicatesStrategy = 'exclude'
+
+        from(file('include')) {
+            into 'include'
+        }
+
+        project.model {
+            binaries {
+                withType(StaticLibraryBinarySpec) { binary ->
+                    from(binary.staticLibraryFile) {
+                        into getPlatformPath(binary)
+                    }
+                }
+                withType(SharedLibraryBinarySpec) { binary ->
+                    from(binary.sharedLibraryFile) {
+                        into getPlatformPath(binary)
+                    }
+                    from (new File(binary.sharedLibraryFile.absolutePath + ".debug")) {
+                        into getPlatformPath(binary)
+                    }
+                }
+            }
+        }
+    }
+
+    project.build.dependsOn project.pubsZip
+
+    project.debugStripSetup()
+
+    project.tasks.whenTaskAdded { task ->
+        def name = task.name.toLowerCase()
+        if (name.contains("pubssharedlibrary") || name.contains("pubsstaticlibrary") || name.contains("pubstest")) {
+            project.pubsZip.dependsOn task
+        }
+    }
+}
+
+apply plugin: 'cpp'
+
+if (ext.runTests) {
+    apply from: "${rootDir}/unittest/unittest.gradle"
+}
+
+pubsSetupModel(project)
+pubsZipTask(project)
+useWpiUtil(project)
+
+task pubsSourceZip(type: Zip) {
+    description = 'Creates a sources-zip of the pubs source files'
+    group = 'WPILib'
+    destinationDir = project.buildDir
+    baseName = 'pubs'
+    classifier = "sources"
+    duplicatesStrategy = 'exclude'
+
+    from('src') {
+        into 'src'
+    }
+
+    from('include') {
+        into 'include'
+    }
+}

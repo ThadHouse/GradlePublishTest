@@ -1,0 +1,38 @@
+import org.gradle.internal.os.OperatingSystem
+
+ext.configurationName = ""
+
+if (project.hasProperty("configuration")) { 
+    configurationName = project.configuration;
+}  else if (OperatingSystem.current().isLinux()) {
+    def arch = System.getProperty("os.arch")
+    if (arch == 'amd64' || arch == 'i386') {
+        configurationName = "linux"
+    } else {
+        configurationName = 'nativearm'
+    }  
+} else if (OperatingSystem.current().isMacOsX()) {
+    configurationName = "mac"
+} else if (OperatingSystem.current().isWindows()) {
+    // default to windows 2015, need to find an easy way to detect
+    configurationName = "windows2015"
+} else {
+    throw new GradleException("${name} does not support building on ${ext.buildPlatform}.")
+}
+
+ext.configurationPlatform = "${rootDir}/configurations/${configurationName}/toolchain.gradle"
+
+apply from: configurationPlatform
+
+ext.setupDefines = { project, binaries ->
+    binaries.all { binary ->
+      if (project.hasProperty('debug')) {
+          project.setupDebugDefines(cppCompiler, linker)
+      } else {
+          project.setupReleaseDefines(cppCompiler, linker)
+      }
+      tasks.withType(CppCompile) {
+          addWpiUtilStaticLibraryLinks(it, linker, binary)
+      }
+    }
+}

@@ -1,0 +1,53 @@
+ext.runTests = true
+ext.classifier = 'windows2013'
+ext.buildPlatform = 'x86'
+ext.buildPlatform2 = 'x64'
+
+model {
+    platforms {
+        x86 {
+            architecture 'x86'
+        }
+        x64 {
+            architecture 'x86_64'
+        }
+    }
+    toolChains {
+        visualCpp(VisualCpp) {
+            eachPlatform {
+                cppCompiler.withArguments { args ->
+                    args << '/EHsc' << '/DNOMINMAX' << '/D_SCL_SECURE_NO_WARNINGS' << '/D_WINSOCK_DEPRECATED_NO_WARNINGS'
+                }
+            }
+        }
+    }
+}
+
+ext.getPlatformPath = { binary ->
+    if (binary.targetPlatform.architecture.amd64) {
+        return 'Windows/amd64'
+    } else {
+        return 'Windows/' + binary.targetPlatform.architecture.name
+    }
+}
+
+ext.setupReleaseDefines = { cppCompiler, linker ->
+    cppCompiler.args '/O2', '/Zi', '/FS'
+}
+
+ext.setupDebugDefines = { cppCompiler, linker ->
+    cppCompiler.args '/Zi', '/FS'
+    linker.args '/DEBUG'
+}
+
+ext.setupDef = { linker, deffile ->
+    linker.args "/DEF:${deffile}"
+}
+
+// This is a noop on Windows. On gcc platforms, we strip the release binary and create a separate
+// debug library, but Windows already separates debug symbols into a .pdb file.
+ext.debugStripSetup = { }
+
+// This is a noop on Windows. The def file already implicilty checks for the symbols
+ext.checkNativeSymbols = { getSymbolFunc ->
+}
